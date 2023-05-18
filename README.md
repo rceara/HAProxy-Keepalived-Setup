@@ -27,7 +27,9 @@ Links to access the community: http://discourse.haproxy.org/  & https://www.mail
 Lets go through the configuration and integration process of HAProxy with your gRPC collectors to monitor your Cisco Infrastructure:
 
 Install HAProxy:
+```
 apt install haproxy
+```
 
 
 
