@@ -28,7 +28,193 @@ Lets go through the configuration and integration process of HAProxy with your g
 
 Install HAProxy:
 ```
-apt install haproxy
+root@collector3:/etc/haproxy# apt install haproxy
+```
+Verify HAProxy config to see if there is any errors:
+```
+root@collector3:/etc/haproxy# haproxy -f /etc/haproxy/haproxy.cfg -c
+```
+Start and verify the status of HAProxy:
+```
+root@collector3:/etc/haproxy# systemctl start haproxy
+```
+```
+root@collector3:/etc/haproxy# systemctl status haproxy
+```
+
+Verify HAProxy Logs:
+```
+root@collector3:/etc/haproxy# tail -F /var/log/haproxy.log
+```
+All HAProxy instances in the cluster should have the same configuration for peers settings. After you've restarted the 
+HAProxy service on each server, you can make a request to the website so that an entry is added to the table and then use socket commands to check that the data is replicated. The following command would show you the entries stored in the grpc_servers table on the primary: 
+```
+root@collector3:/etc/haproxy# echo "show table grpc_servers" | sudo socat stdio /run/haproxy/admin.sock
+# table: grpc_servers, type: ip, size:1048576, used:1
+0x555647bbfe30: key=10.93.178.70 use=0 exp=1706183 server_id=1 server_key=s1
+```
+## Here is a snapshot Configuration of HA Proxy1: ##
+```
+root@collector3:~# more /etc/haproxy/haproxy.cfg
+```
+```
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+        ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-
+GCM-SHA384
+        ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+        ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+
+defaults
+	log	global
+	mode	tcp
+	option  tcplog
+        option	dontlognull
+        timeout connect 30s
+        timeout client  60m
+        timeout server  60m
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+listen  stats
+        bind		10.93.178.155:1936
+        mode            http
+        log             global
+        stats enable
+        stats hide-version
+        stats refresh 30s
+        stats show-node
+        stats auth netadmin:C1sco12345
+        stats uri  /haproxy?stats
+	stats show-desc Load-Balancer1
+	stats show-legends
+	stats admin if TRUE	# Thestatspage is great for seeing the status of our backend servers, but we can alsocontrolthemthrough this page. When we add astats admindirective, the page displays a checkbox next to eachserver and a dropdown men
+u that lets you perform an action on it
+
+peers mycluster
+  peer collector3.amazonaccountteam.com 10.93.178.155:10000
+  peer loadbalancer2 10.93.178.173:10000
+
+frontend grpc_service
+   mode tcp
+   log global
+   option logasap
+   option tcplog
+   bind *:57499
+   default_backend grpc_servers
+
+backend grpc_servers
+   mode tcp
+   #balance source
+   balance leastconn
+   option log-health-checks
+   option ssl-hello-chk
+   server s1 10.93.178.157:57499 check
+   server s2 10.93.178.175:57499 check
+   server s3 10.93.178.176:57499 check
+   stick-table type ip size 1m size 1m expire 30m peers mycluster
+   stick on src
+   #stick match src
+```
+## Here is a snapshot Configuration of HA Proxy2: ##
+```
+root@collector3:~# more /etc/haproxy/haproxy.cfg
+```
+```
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+        ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-
+GCM-SHA384
+        ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+        ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+
+defaults
+	log	global
+	mode	tcp
+	option  tcplog
+        option	dontlognull
+        timeout connect 30s
+        timeout client  60m
+        timeout server  60m
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+
+listen  stats
+        bind		10.93.178.173:1936
+        mode            http
+        log             global
+        stats enable
+        stats hide-version
+        stats refresh 30s
+        stats show-node
+        stats auth netadmin:C1sco12345
+        stats uri  /haproxy?stats
+        stats show-desc Load-Balancer1
+	stats show-legends
+	stats admin if TRUE	# Thestatspage is great for seeing the status of our backend servers, but we can alsocontrolthemthrough this page. When we add astats admin directive, the page displays a checkbox next to eachserver and a dropdown me
+nu that lets you perform an action on it
+
+peers mycluster
+  peer loadbalancer1 10.93.178.155:10000
+  peer collector3.amazonaccountteam.com 10.93.178.173:10000
+
+frontend grpc_service
+   mode tcp
+   log global
+   option logasap
+   option tcplog
+   bind *:57499
+   default_backend grpc_servers
+
+backend grpc_servers
+   mode tcp
+   #balance source
+   balance leastconn
+   option log-health-checks
+   option ssl-hello-chk
+   server s1 10.93.178.157:57499 check
+   server s2 10.93.178.175:57499 check
+   server s3 10.93.178.176:57499 check
+   stick-table type ip size 1m size 1m expire 30m peers mycluster
+   stick on src
+   #stick match src
 ```
 
 
