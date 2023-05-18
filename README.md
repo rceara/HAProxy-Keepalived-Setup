@@ -1,5 +1,5 @@
 # HAProxySetup
-# Setup HAProxy as load balancers for gRPC with Cisco gear #
+# Setup HAProxy as load balancers for Model Driven Telemetry with Cisco gear #
 
 ## Before we start our journey installing and configuring HAProxy I would like to share some thoughts about the power of HAProxy as an OpenSource Load Balancer. ##
 
