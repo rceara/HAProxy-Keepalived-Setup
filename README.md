@@ -220,4 +220,161 @@ backend grpc_servers
 # KeepAlived Setup #
 # Setup KeepAlived for the load balancers to send all the traffic from the Cisco gear to a floating of virtual IP #
 
+## Installation and Configuration Keepalived services to work with HAProxy. Make sure you follow this process on Server1 and Server2 of HAProxy. ##
 
+Install keepalived:
+```
+root@collector3:~# apt install keepalived
+```
+
+In order for the Keepalived service to forward network packets properly to the real servers, each router node must have IP forwarding turned on in the kernel:
+```
+root@collector3:~# vi /etc/sysctl.conf
+```
+Add the following lines: 
+```
+net.ipv4.ip_forward = 1
+net.ipv4.ip_nonlocal_bind=1
+```
+
+Then run the CLI command: sysctl -p
+```
+root@collector3:~# sysctl -p
+net.ipv4.ip_forward = 1
+net.ipv4.ip_nonlocal_bind = 1
+```
+
+## Configure keepalive on HAProxy 1: ##
+```
+root@collector3:~# more /etc/keepalived/keepalived.conf
+# Define the script used to check if haproxy is still working
+vrrp_script chk_haproxy {
+    script "/usr/bin/killall -0 haproxy"
+    interval 2  # check every 2 seconds
+    weight -2
+    fall 2      # check twice before setting down
+    rise 1      # check once before setting up
+}
+
+vrrp_instance haproxy1 {
+    state MASTER
+    interface ens160
+    virtual_router_id 101 # Needs to be the same on both Server
+    priority 101	  # Higher Priority then master, lower priority then backup
+    advert_int 1	#  VRRP advertisment interval
+    authentication {
+        auth_type PASS	# Use a password to negotiate the vrrp session
+        auth_pass C1sco12345
+    }
+    virtual_ipaddress{
+        10.93.178.174	# Define the VIP address to be used
+    }
+
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_haproxy
+    }
+
+}
+vrrp_instance haproxy2 {
+    state BACKUP
+    interface ens160
+    virtual_router_id 102 # Needs to be the same on both Server
+    priority 100          # Higher Priority then master, lower priority then backup
+    advert_int 1        #  VRRP advertisment interval
+    authentication {
+        auth_type PASS  # Use a password to negotiate the vrrp session
+        auth_pass C1sco12345
+    }
+    virtual_ipaddress{
+        10.93.178.177   # Define the VIP address to be used
+    }
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_haproxy
+    }
+}
+```
+## Configure keepalive on HAProxy 2: ##
+```
+root@collector3:~# more /etc/keepalived/keepalived.conf
+# Define the script used to check if haproxy is still working
+vrrp_script chk_haproxy {
+    script "/usr/bin/killall -0 haproxy"
+    interval 2	# check every 2 seconds
+    weight -2
+    fall 2	# check twice before setting down
+    rise 1	# check once before setting up
+}
+
+vrrp_instance haproxy1 {
+    state BACKUP
+    interface ens160
+    virtual_router_id 101 # Needs to be the same on both Server
+    priority 100	 # Higher Priority then master, lower priority then backup
+    advert_int 1	#  VRRP advertisment interval
+    authentication {
+        auth_type PASS	# Use a password to negotiate the vrrp session
+        auth_pass C1sco12345
+    }
+    virtual_ipaddress{
+        10.93.178.174	# Define the VIP address to be used
+    }
+
+    }
+
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_haproxy
+    }
+}
+vrrp_instance haproxy2 {
+    state MASTER
+    interface ens160
+    virtual_router_id 102 # Needs to be the same on both Server
+    priority 101         # Higher Priority then master, lower priority then backup
+    advert_int 1        #  VRRP advertisment interval
+    authentication {
+        auth_type PASS  # Use a password to negotiate the vrrp session
+        auth_pass C1sco12345
+    }
+    virtual_ipaddress{
+        10.93.178.177   # Define the VIP address to be used
+    }
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_haproxy
+    }
+}
+```
+## Start Keepalive service: ##
+```
+root@collector3:~# systemctl start keepalived
+```
+## Verify Keepalive service: ##
+```
+root@collector3:~#  systemctl status keepalived
+```
+
+## Verify floating/virtual IP on the interface: ##
+```
+root@collector3:~# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:0c:29:7b:5c:d5 brd ff:ff:ff:ff:ff:ff
+    altname enp3s0
+    inet 10.93.178.155/26 brd 10.93.178.191 scope global ens160
+       valid_lft forever preferred_lft forever
+   ** inet 10.93.178.174/32 scope global ens160**
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe7b:5cd5/64 scope link 
+       valid_lft forever preferred_lft forever
+```
+
+
+ 
