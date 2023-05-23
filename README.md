@@ -356,7 +356,7 @@ root@collector3:~# systemctl start keepalived
 root@collector3:~#  systemctl status keepalived
 ```
 
-## Verify floating/virtual IP on the interface: ##
+## Verify floating/virtual IP on the interface. I marked it as ** so you can look for the output when running the CLI command ##
 ```
 root@collector3:~# ip addr
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -370,7 +370,7 @@ root@collector3:~# ip addr
     altname enp3s0
     inet 10.93.178.155/26 brd 10.93.178.191 scope global ens160
        valid_lft forever preferred_lft forever
-   ** inet 10.93.178.174/32 scope global ens160**
+   ** inet 10.93.178.174/32 scope global ens160 **
        valid_lft forever preferred_lft forever
     inet6 fe80::20c:29ff:fe7b:5cd5/64 scope link 
        valid_lft forever preferred_lft forever
