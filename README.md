@@ -193,7 +193,7 @@ nu that lets you perform an action on it
 
 peers mycluster
   peer loadbalancer1 10.93.178.155:10000
-  peer collector3.amazonaccountteam.com 10.93.178.173:10000
+  peer collector3.mydomainname.com 10.93.178.173:10000
 
 frontend grpc_service
    mode tcp
